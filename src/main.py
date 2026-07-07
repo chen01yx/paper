@@ -8,7 +8,7 @@ import re
 import logging
 import json
 from datetime import datetime, date
-from collections import OrderedDict
+from collections import OrderedDict  # kept for potential future use
 
 # Add parent dir to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,8 +17,8 @@ from config import (
     CATEGORIES, PAPERS_PER_CATEGORY, OUTPUT_DIR,
     INSTITUTION_KEYWORDS,
 )
-from src.search.arxiv_search import search_arxiv
-from src.search.semantic_scholar import search_semantic_scholar
+from src.search.arxiv_rss import fetch_arxiv_rss
+from src.search.openalex import search_openalex
 from src.download.pdf_downloader import download_pdf
 from src.read.summarizer import summarize_paper
 from src.organize.file_organizer import create_paper_dir, save_summary
@@ -86,7 +86,9 @@ CATEGORY_MANDATORY_KEYWORDS = {
                     "force-torque sensing", "ft sensor", "contact sensing"],
         # 并且必须包含机器人操作词
         "robot": ["robot manipulation", "robotic grasping", "robot gripper",
-                  "manipulation robot", "grasping robot", "gripper"],
+                  "manipulation robot", "grasping robot", "gripper",
+                  "robotic manipulation", "robotic", "manipulation",
+                  "grasping", "robot arm", "manipulator", "dexterous"],
     },
 }
 
@@ -199,7 +201,42 @@ def scan_existing_paper_titles() -> set:
     return existing_titles
 
 
-def process_category(category: str, category_config: dict, today_str: str, history: set, existing_folder_titles: set):
+def fetch_paper_pool(categories_config: dict) -> list[dict]:
+    """
+    一次性获取所有论文候选（替代原来的逐条 API 查询）。
+
+    - arXiv RSS: 每个分类 1 次请求（cs.RO/AI/CV/LG 共 4 次）
+    - OpenAlex: 每个 paper bot 类别 2 条查询（共 6 次）
+    总计 ~10 次 HTTP 请求（原来 ~30+ 次且频繁 429）
+    """
+    pool = []
+    seen_titles = set()
+
+    def _add_papers(papers):
+        for paper in papers:
+            key = normalize_title(paper["title"])
+            if key and key not in seen_titles:
+                seen_titles.add(key)
+                pool.append(paper)
+
+    # 1. arXiv RSS 批量获取（4 次请求拿到数百篇论文）
+    logger.info("--- Fetching arXiv RSS feeds ---")
+    rss_papers = fetch_arxiv_rss()
+    _add_papers(rss_papers)
+
+    # 2. OpenAlex 补充（每个类别取前 4 条 query 搜索）
+    logger.info("--- Searching OpenAlex for supplementary papers ---")
+    for cat_name, cat_config in categories_config.items():
+        queries = cat_config["queries"][:4]
+        for query in queries:
+            results = search_openalex(query, limit=5)
+            _add_papers(results)
+
+    logger.info(f"Paper pool: {len(pool)} unique candidate papers")
+    return pool
+
+
+def process_category(category: str, category_config: dict, today_str: str, history: set, existing_folder_titles: set, paper_pool: list):
     """Process a single category: search, download, summarize, save."""
     logger.info(f"\n{'='*60}")
     logger.info(f"Processing category: {category}")
@@ -210,27 +247,26 @@ def process_category(category: str, category_config: dict, today_str: str, histo
     required_keywords = category_config["required_keywords"]
     deprioritize_keywords = category_config["deprioritize_keywords"]
 
+    # 从论文池中本地过滤（不再发 API 请求）
     all_papers = []
-
-    logger.info(f"Searching with {len(queries)} queries...")
-    for query in queries:
-        arxiv_results = search_arxiv(query)
-        all_papers.extend(arxiv_results)
-
-        # Only call Semantic Scholar for every 3rd query to reduce API calls
-        if queries.index(query) % 3 == 0:
-            ss_results = search_semantic_scholar(query, limit=3)
-            all_papers.extend(ss_results)
-
-    # Deduplicate
-    seen = OrderedDict()
     history_normalized = {normalize_title(t) for t in history}
-    for paper in all_papers:
-        key = normalize_title(paper["title"])
-        if key and key not in seen and key not in history_normalized and key not in existing_folder_titles:
-            seen[key] = paper
 
-    all_papers = list(seen.values())
+    logger.info(f"Filtering from paper pool ({len(paper_pool)} candidates)...")
+    for paper in paper_pool:
+        key = normalize_title(paper["title"])
+        if not key or key in history_normalized or key in existing_folder_titles:
+            continue
+
+        combined = (paper.get("title", "") + " " + paper.get("abstract", "")).lower()
+
+        # 检查是否匹配该类别的任一搜索关键词
+        for query in queries:
+            # 提取查询中的关键词（保留引号内短语，忽略短词）
+            terms = [t.strip('"') for t in re.findall(r'"[^"]*"|\w+', query.lower())]
+            terms = [t for t in terms if len(t) > 2]
+            if terms and all(t in combined for t in terms):
+                all_papers.append(paper)
+                break
     logger.info(f"Total unique papers found for {category}: {len(all_papers)}")
 
     # Score and sort
@@ -328,9 +364,12 @@ def main():
     existing_folder_titles = scan_existing_paper_titles()
     logger.info(f"Found {len(existing_folder_titles)} existing paper folders across all categories")
 
+    # 一次性获取论文候选池（替代原来每个类别逐条查询）
+    paper_pool = fetch_paper_pool(CATEGORIES)
+
     # Process each category
     for category, category_config in CATEGORIES.items():
-        process_category(category, category_config, today_str, history, existing_folder_titles)
+        process_category(category, category_config, today_str, history, existing_folder_titles, paper_pool)
 
     # Save history
     save_history(history)

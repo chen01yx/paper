@@ -63,7 +63,7 @@ def summarize_paper(pdf_path: str, paper_info: dict | None = None) -> str | None
     try:
         prompt_with_url = f"{SUMMARY_PROMPT}\n{url_line}\n--- 论文正文内容（前10页） ---\n\n{text[:18000]}"
         message = client.messages.create(
-            model="qwen3.6-plus",
+            model="qwen3.6-flash",
             max_tokens=1024,
             system="你是一个机器人研究助手，请用中文输出所有内容。",
             messages=[

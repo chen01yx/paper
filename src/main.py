@@ -7,6 +7,8 @@ import sys
 import re
 import logging
 import json
+import math
+import random
 from datetime import datetime, date
 from collections import OrderedDict  # kept for potential future use
 
@@ -162,6 +164,58 @@ def score_paper(paper: dict, required_keywords: list, deprioritize_keywords: lis
     return score
 
 
+# === Probabilistic paper selection ===
+# Uses soft-max weights so high-scored papers are picked more often,
+# but older / lower-scored papers still have a non-zero chance — giving
+# multiple daily runs a shot at accumulating more diverse papers.
+
+def pick_papers_from_pool(
+    scored_papers: list[dict], target: int, temperature: float = 0.5
+) -> list[str]:
+    """
+    Softmax-weighted random sampling without replacement.
+
+    Returns a list of normalised titles that were picked.
+    """
+    # Filter out already-selected papers (those already processed this run)
+    remaining = [p for p in scored_papers if p["_title_key"] not in _picked_titles]
+
+    if not remaining:
+        return []
+
+    # If too few candidates remain, just take them all
+    if len(remaining) <= target:
+        _picked_titles.update(p["_title_key"] for p in remaining)
+        return [normalize_title(p["title"]) for p in remaining]
+
+    # Build soft-max weights
+    scores = [p["_score"] for p in remaining]
+    shifted = [s - max(scores) for s in scores]  # numerical stability
+    scaled = [s / temperature for s in shifted]
+    exp_scores = [math.exp(s) for s in scaled]
+    total = sum(exp_scores)
+    probs = [e / total for e in exp_scores]
+
+    # Sample without replacement (accept-reject approximation via repeated weighted sampling)
+    indices = set()
+    attempts = 0
+    while len(indices) < min(target, len(probs)) and attempts < len(probs) * 20:
+        idx = random.choices(range(len(probs)), weights=probs, k=1)[0]
+        if idx not in indices:
+            indices.add(idx)
+        attempts += 1
+
+    picked = []
+    for idx in sorted(indices):
+        p = remaining[idx]
+        _picked_titles.add(p["_title_key"])
+        picked.append(normalize_title(p["title"]))
+    return picked
+
+
+_picked_titles: set[str] = set()       # per-run tracking of already-selected papers
+
+
 def get_existing_paper_count(category: str, today_str: str) -> int:
     """Count how many papers already exist in today's date directory for a category."""
     parts = today_str.split('-')
@@ -279,25 +333,36 @@ def process_category(category: str, category_config: dict, today_str: str, histo
     logger.info(f"Papers passing mandatory filter: {len(valid_papers)} / {len(all_papers)}")
     all_papers = valid_papers
 
-    # Remove the daily hard cap: let each run consume from the full candidate pool.
-    # Dedup via processed_papers.json + existing folders prevents re-downloading.
-    # This way, multiple runs on the same day will keep accumulating new papers.
-    existing_count = get_existing_paper_count(category, today_str)
-    logger.info(f"Today already has {existing_count} papers for {category}")
 
+    # Pre-compute _title_key so pick_papers_from_pool can reference it
+    for p in all_papers:
+        p["_title_key"] = normalize_title(p["title"])
+
+    # Use softmax-weighted random sampling instead of taking Top-N or all.
+    # Higher-scored papers are picked more often, but older/lower-scored
+    # papers still have a non-zero chance — giving multiple daily runs a
+    # shot at accumulating more diverse papers.
     if len(all_papers) == 0:
         logger.info(f"No valid papers found for {category} after filtering, skipping.")
         return
 
-    selected = all_papers[:]  # process ALL remaining candidates
-    logger.info(f"Processing all {len(selected)} remaining candidate papers for {category}")
+    selected_titles = pick_papers_from_pool(all_papers, target=PAPERS_PER_CATEGORY, temperature=0.5)
+    if not selected_titles:
+        logger.info(f"No papers selected for {category} after weighted sampling.")
+        return
+
+    # Map picked titles back to paper dicts
+    history_and_existing = history_normalized | existing_folder_titles
+    selected = [p for p in all_papers if p["_title_key"] in selected_titles]
+    logger.info(f"Selected {len(selected)} papers out of {len(all_papers)} candidates for {category} (weighted random, target={PAPERS_PER_CATEGORY})")
 
     # Create category output directory
     parts = today_str.split('-')
     category_output_dir = os.path.join(OUTPUT_DIR, category, parts[0], parts[1], parts[2])
     os.makedirs(category_output_dir, exist_ok=True)
 
-    # Process papers
+    # Process papers (index starts from existing count so files are numbered correctly)
+    existing_count = get_existing_paper_count(category, today_str)
     paper_index = existing_count
     for i, paper in enumerate(selected):
         title = paper["title"]
@@ -365,6 +430,9 @@ def main():
 
     # 一次性获取论文候选池（替代原来每个类别逐条查询）
     paper_pool = fetch_paper_pool(CATEGORIES)
+
+    # Reset per-run picked set once at the start of this entire run
+    _picked_titles.clear()
 
     # Process each category
     for category, category_config in CATEGORIES.items():

@@ -125,6 +125,10 @@ def fetch_arxiv_rss(categories: list = None) -> list[dict]:
 
     每个分类只需 1 次 HTTP 请求（替代原来的 26 次逐条查询）。
 
+    注意：这里不再做基础相关性过滤，而是把论文全部放回候选池，
+    由 process_category 中更精细的类别关键词匹配来决定是否选中。
+    这样能避免因基础过滤太宽泛而导致特定类别论文的漏检。
+
     Args:
         categories: arXiv 分类列表，默认 cs.RO/AI/CV/LG
 
@@ -148,19 +152,19 @@ def fetch_arxiv_rss(categories: list = None) -> list[dict]:
                 continue
 
             papers = _parse_rss(resp.content)
-            new_count = 0
+            added = 0
             for paper in papers:
                 aid = paper["arxiv_id"]
                 if aid not in seen_ids:
                     seen_ids.add(aid)
-                    if _is_relevant(paper["title"], paper["abstract"]):
-                        all_papers.append(paper)
-                        new_count += 1
+                    # Keep all papers — fine-grained filtering happens later
+                    all_papers.append(paper)
+                    added += 1
 
-            logger.info(f"  {cat}: {len(papers)} papers fetched, {new_count} relevant & new")
+            logger.info(f"  {cat}: {len(papers)} papers fetched, {added} unique added to pool")
 
         except Exception as e:
             logger.error(f"  Failed to fetch RSS {cat}: {e}")
 
-    logger.info(f"arXiv RSS total: {len(all_papers)} relevant papers (from {len(categories)} feeds)")
+    logger.info(f"arXiv RSS total: {len(all_papers)} papers added to pool (from {len(categories)} feeds)")
     return all_papers

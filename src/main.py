@@ -279,19 +279,18 @@ def process_category(category: str, category_config: dict, today_str: str, histo
     logger.info(f"Papers passing mandatory filter: {len(valid_papers)} / {len(all_papers)}")
     all_papers = valid_papers
 
-    # Check existing count
+    # Remove the daily hard cap: let each run consume from the full candidate pool.
+    # Dedup via processed_papers.json + existing folders prevents re-downloading.
+    # This way, multiple runs on the same day will keep accumulating new papers.
     existing_count = get_existing_paper_count(category, today_str)
-    papers_needed = PAPERS_PER_CATEGORY - existing_count
-    if papers_needed <= 0:
-        logger.info(f"Already have {existing_count} papers for {category} today, skipping.")
-        return
+    logger.info(f"Today already has {existing_count} papers for {category}")
 
     if len(all_papers) == 0:
         logger.info(f"No valid papers found for {category} after filtering, skipping.")
         return
 
-    selected = all_papers[:papers_needed]
-    logger.info(f"Already have {existing_count} papers, selecting top {len(selected)} new ones")
+    selected = all_papers[:]  # process ALL remaining candidates
+    logger.info(f"Processing all {len(selected)} remaining candidate papers for {category}")
 
     # Create category output directory
     parts = today_str.split('-')

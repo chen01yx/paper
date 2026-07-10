@@ -1,5 +1,5 @@
 """
-论文总结模块 — 调用 Anthropic API 生成中文摘要
+Paper summarization module — calls Anthropic API to generate Chinese summaries
 """
 import logging
 import pymupdf
@@ -40,7 +40,7 @@ def extract_text_from_pdf(pdf_path: str, max_pages: int = 10) -> str:
 
 def summarize_paper(pdf_path: str, paper_info: dict | None = None) -> str | None:
     """
-    Read PDF and generate a Chinese summary using Claude API.
+    Read PDF and generate a Chinese summary using Anthropic API.
     paper_info: dict with url, arxiv_id, doi etc. for embedding in summary.
     Returns the summary text, or None on failure.
     """
@@ -53,19 +53,19 @@ def summarize_paper(pdf_path: str, paper_info: dict | None = None) -> str | None
     url_line = ""
     if paper_info:
         if paper_info.get("arxiv_id"):
-            url_line = f"**论文链接**: https://arxiv.org/abs/{paper_info['arxiv_id']}\n"
+            url_line = f"**Paper Link**: https://arxiv.org/abs/{paper_info['arxiv_id']}\n"
         elif paper_info.get("doi"):
-            url_line = f"**论文链接**: https://doi.org/{paper_info['doi']}\n"
+            url_line = f"**Paper Link**: https://doi.org/{paper_info['doi']}\n"
         if paper_info.get("pdf_url"):
-            url_line += f"**PDF下载**: {paper_info['pdf_url']}\n"
+            url_line += f"**PDF Download**: {paper_info['pdf_url']}\n"
 
     logger.info(f"  Generating summary for {pdf_path}")
     try:
-        prompt_with_url = f"{SUMMARY_PROMPT}\n{url_line}\n--- 论文正文内容（前10页） ---\n\n{text[:18000]}"
+        prompt_with_url = f"{SUMMARY_PROMPT}\n{url_line}\n--- Paper content (first 10 pages) ---\n\n{text[:18000]}"
         message = client.messages.create(
             model="qwen3.6-flash",
             max_tokens=1024,
-            system="你是一个机器人研究助手，请用中文输出所有内容。",
+            system="You are a robotics research assistant. Please output everything in Chinese.",
             messages=[
                 {"role": "user", "content": prompt_with_url}
             ],

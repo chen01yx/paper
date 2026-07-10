@@ -1,6 +1,6 @@
 """
-文件组织模块 — 按类别和日期创建目录结构
-目录结构: output/category/yyyy/mm/dd/NNN-short-summary/
+File organization module — creates directory structure by category and date
+Directory structure: output/category/yyyy/mm/dd/NNN-short-summary/
 """
 import os
 import re

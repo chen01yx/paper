@@ -1,5 +1,5 @@
 """
-PDF 下载模块
+PDF download module
 """
 import os
 import re
@@ -14,7 +14,7 @@ HEADERS = {
 
 
 def _resolve_arxiv_id_from_url(pdf_url: str) -> str | None:
-    """从 URL 中提取 arXiv ID（格式 2607.xxxxx）。"""
+    """Extract arXiv ID from URL (format: 2607.xxxxx)."""
     if not pdf_url:
         return None
     # Match patterns like 2607.03941, cs.DC/0606100, etc.

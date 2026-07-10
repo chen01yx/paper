@@ -1,25 +1,25 @@
 """
-Paper Bot 配置文件
+Paper Bot configuration file
 """
 import os
 from datetime import datetime
 
-# === Anthropic API (论文总结用) ===
+# === Anthropic API (for paper summarization) ===
 ANTHROPIC_BASE_URL = os.environ.get("ANTHROPIC_BASE_URL", "https://test-llm-gateway.galbot.work")
 ANTHROPIC_AUTH_TOKEN = os.environ.get("ANTHROPIC_AUTH_TOKEN", "")
 
-# === 保存路径 ===
+# === Output paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 
-# === 类别配置 ===
-# 每个类别每天的论文数量
+# === Category configuration ===
+# Number of papers per category per day
 PAPERS_PER_CATEGORY = 2
 
-# 类别定义：名称 -> (搜索关键词列表, 必要关键词列表)
+# Category definitions: name -> (search queries list, required keywords list)
 CATEGORIES = {
     "main": {
-        "description": "具身智能相关文章（必须是机器人操控，排除纯LLM）",
+        "description": "Embodied AI articles (must be robot manipulation, excluding pure LLM)",
         "queries": [
             '"embodied AI" robot manipulation',
             '"embodied intelligence" robot learning',
@@ -29,7 +29,7 @@ CATEGORIES = {
             "robot foundation model manipulation",
         ],
         "required_keywords": [
-            # 必须包含机器人操控词
+            # Must include robot manipulation terms
             "robot manipulation", "robotic manipulation", "robot grasping",
             "robotic grasping", "robot gripper", "manipulation robot",
             "grasping robot", "gripper", "robot arm",
@@ -37,24 +37,24 @@ CATEGORIES = {
             "generalist robot", "robot foundation model",
         ],
         "deprioritize_keywords": [
-            # 运动类
+            # Locomotion-related
             "locomotion", "legged robot", "quadruped", "walking robot",
-            # 自动驾驶
+            # Autonomous driving
             "self-driving", "autonomous driving", "vehicle planning",
-            # 纯LLM/语言模型训练（强烈排除）
+            # Pure LLM / language model training (strongly excluded)
             "language model", "llm", "large language model", "NLP",
             "rlvr", "verifiable rewards", "reward hacking",
             "reasoning model", "llm training", "text generation",
-            # 图像生成
+            # Image generation
             "diffusion model", "image generation", "text-to-image", "text-to-video",
-            # 博弈论/多智能体
+            # Game theory / multi-agent
             "game theory", "nash equilibrium", "multi-agent game", "auction", "bidding",
-            # 其他不相关领域
+            # Other unrelated fields
             "brain decoding", "fMRI", "medical imaging", "drug discovery",
         ],
     },
     "egobench": {
-        "description": "灵巧手操作、人类视频训练、仿真评测、触觉策略",
+        "description": "Dexterous hand manipulation, human video training, simulation evaluation, tactile policies",
         "queries": [
             '"dexterous hand manipulation" robot',
             '"robotic hand" manipulation learning',
@@ -78,22 +78,22 @@ CATEGORIES = {
             "manipulation policy", "control policy",
         ],
         "deprioritize_keywords": [
-            # 腿式机器人/运动（强烈排除）
+            # Legged robots / locomotion (strongly excluded)
             "locomotion", "loco-manipulation", "legged robot", "quadruped",
             "pedipulation", "foot manipulation", "walking robot", "bipedal",
             "buoyancy-assisted", "morphology design",
-            # 自动驾驶
+            # Autonomous driving
             "self-driving", "autonomous driving",
-            # 纯语言模型
+            # Pure language models
             "language model", "llm", "large language model",
-            # 图像生成
+            # Image generation
             "diffusion model", "image generation",
-            # 其他
+            # Other
             "brain decoding", "fMRI", "NLP",
         ],
     },
     "tacvla": {
-        "description": "触觉感知+机器人操作（必须包含tactile/haptic等明确触觉技术）",
+        "description": "Tactile perception + robot manipulation (must include explicit tactile tech like tactile/haptic)",
         "queries": [
             '"tactile sensing" robot manipulation',
             '"tactile feedback" robotic grasping',
@@ -107,39 +107,39 @@ CATEGORIES = {
             "tactile-based manipulation",
         ],
         "required_keywords": [
-            # 必须包含核心触觉词
+            # Must include core tactile terms
             "tactile sensing", "tactile feedback", "tactile sensor",
             "gelsight", "tactile glove",
             "visuo-tactile", "visual-tactile",
             "haptic sensing", "haptic feedback",
             "touch sensor", "touch-based manipulation",
-            # 并且必须包含机器人操作词
+            # And must include robot manipulation terms
             "robot manipulation", "robotic grasping", "robot gripper",
         ],
         "deprioritize_keywords": [
-            # 自动驾驶
+            # Autonomous driving
             "self-driving", "autonomous driving", "autonomous vehicle", "av", "car", "drone",
-            # 纯LLM/语言模型
+            # Pure LLM / language models
             "language model", "llm", "large language model", "agentic", "context-aware rl",
             "neural dynamics", "variational dynamics",
-            # 腿式机器人/运动
+            # Legged robots / locomotion
             "locomotion", "legged robot", "quadruped", "walking", "floating-base",
-            # 导航/无人机
+            # Navigation / drones
             "navigation", "drone racing", "path planning",
-            # 脑机接口/EEG
+            # BCI / EEG
             "brain-computer interface", "bci", "eeg", "neuro",
-            # 其他不相关
+            # Other unrelated
             "diffusion model", "image generation", "brain decoding", "fMRI",
             "medical imaging", "drug discovery", "world model",
         ],
     },
 }
 
-# === 检索源配置 ===
+# === Search source configuration ===
 ARXIV_MAX_RESULTS_PER_QUERY = 5
 SEMANTIC_SCHOLAR_LIMIT = 3
 
-# 大型研究机构（用于优先级加分）
+# Large research institutions (for priority bonus)
 INSTITUTION_KEYWORDS = [
     "MIT", "Stanford", "CMU", "Berkeley", "Harvard", "Google",
     "DeepMind", "Meta", "Microsoft", "NVIDIA", "ETH", "Oxford", "Cambridge",

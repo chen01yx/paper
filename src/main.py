@@ -1,6 +1,6 @@
 """
-Paper Bot 主入口
-支持多类别分类存储：output/category/yyyy/mm/dd/
+Paper Bot main entry point
+Supports multi-category storage: output/category/yyyy/mm/dd/
 """
 import os
 import sys
@@ -60,10 +60,10 @@ def normalize_title(title: str) -> str:
     return re.sub(r'[^a-z0-9一-鿿]', '', title.lower().strip())
 
 
-# 类别特定的硬性关键词过滤
+# Category-specific mandatory keyword filters
 CATEGORY_MANDATORY_KEYWORDS = {
     "main": {
-        # 必须包含机器人操控相关词（排除纯LLM论文）
+        # Must include robot manipulation terms (excludes pure LLM papers)
         "robot": ["robot manipulation", "robotic manipulation", "robot grasping",
                   "robotic grasping", "robot gripper", "manipulation robot",
                   "grasping robot", "gripper robot", "robot arm",
@@ -72,7 +72,7 @@ CATEGORY_MANDATORY_KEYWORDS = {
                   "generalist robot", "robot foundation model"],
     },
     "egobench": {
-        # 必须包含灵巧手/触觉/双臂/视频训练等核心词
+        # Must include dexterous/tactile/bi-manual/human-video training core terms
         "core": ["dexterous", "dexterity", "multi-finger", "anthropomorphic hand",
                  "in-hand manipulation", "robotic hand", "bimanual", "dual-arm",
                  "tactile", "haptic", "teleoperation", "teleoperated",
@@ -80,13 +80,13 @@ CATEGORY_MANDATORY_KEYWORDS = {
                  "sim2real", "simulation benchmark manipulation"],
     },
     "tacvla": {
-        # 必须包含核心触觉词（必须是明确的触觉感知技术）
+        # Must include core tactile terms (must be explicit tactile perception tech)
         "tactile": ["tactile sensing", "tactile feedback", "tactile sensor",
                     "gelsight", "tactile glove", "digit tactile",
                     "visuo-tactile", "visual-tactile", "tactile vision",
                     "haptic sensing", "haptic feedback", "touch sensor",
                     "force-torque sensing", "ft sensor", "contact sensing"],
-        # 并且必须包含机器人操作词
+        # And must include robot manipulation terms
         "robot": ["robot manipulation", "robotic grasping", "robot gripper",
                   "manipulation robot", "grasping robot", "gripper",
                   "robotic manipulation", "robotic", "manipulation",
@@ -257,11 +257,11 @@ def scan_existing_paper_titles() -> set:
 
 def fetch_paper_pool(categories_config: dict) -> list[dict]:
     """
-    一次性获取所有论文候选（替代原来的逐条 API 查询）。
+    Fetch all paper candidates in one shot (replaces previous per-query API calls).
 
-    - arXiv RSS: 每个分类 1 次请求（cs.RO/AI/CV/LG 共 4 次）
-    - OpenAlex: 每个 paper bot 类别 2 条查询（共 6 次）
-    总计 ~10 次 HTTP 请求（原来 ~30+ 次且频繁 429）
+    - arXiv RSS: 1 request per category (4 total for cs.RO/AI/CV/LG)
+    - OpenAlex: up to 4 queries per paper bot category (6 total)
+    Total ~10 HTTP requests (previously ~30+ with frequent 429s)
     """
     pool = []
     seen_titles = set()
@@ -273,12 +273,12 @@ def fetch_paper_pool(categories_config: dict) -> list[dict]:
                 seen_titles.add(key)
                 pool.append(paper)
 
-    # 1. arXiv RSS 批量获取（4 次请求拿到数百篇论文）
+    # 1. arXiv RSS bulk fetch (hundreds of papers with 4 requests)
     logger.info("--- Fetching arXiv RSS feeds ---")
     rss_papers = fetch_arxiv_rss()
     _add_papers(rss_papers)
 
-    # 2. OpenAlex 补充（每个类别取前 4 条 query 搜索）
+    # 2. OpenAlex supplement (top 4 queries per category)
     logger.info("--- Searching OpenAlex for supplementary papers ---")
     for cat_name, cat_config in categories_config.items():
         queries = cat_config["queries"][:4]
@@ -301,7 +301,7 @@ def process_category(category: str, category_config: dict, today_str: str, histo
     required_keywords = category_config["required_keywords"]
     deprioritize_keywords = category_config["deprioritize_keywords"]
 
-    # 从论文池中本地过滤（不再发 API 请求）
+    # Local filter from paper pool (no more API requests needed)
     all_papers = []
     history_normalized = {normalize_title(t) for t in history}
 
@@ -313,9 +313,9 @@ def process_category(category: str, category_config: dict, today_str: str, histo
 
         combined = (paper.get("title", "") + " " + paper.get("abstract", "")).lower()
 
-        # 检查是否匹配该类别的任一搜索关键词
+        # Check if it matches any search term for this category
         for query in queries:
-            # 提取查询中的关键词（保留引号内短语，忽略短词）
+            # Extract keywords from query (preserve quoted phrases, ignore short words)
             terms = [t.strip('"') for t in re.findall(r'"[^"]*"|\w+', query.lower())]
             terms = [t for t in terms if len(t) > 2]
             if terms and all(t in combined for t in terms):
@@ -428,7 +428,7 @@ def main():
     existing_folder_titles = scan_existing_paper_titles()
     logger.info(f"Found {len(existing_folder_titles)} existing paper folders across all categories")
 
-    # 一次性获取论文候选池（替代原来每个类别逐条查询）
+    # Fetch paper candidate pool in one shot (replaces per-category queries)
     paper_pool = fetch_paper_pool(CATEGORIES)
 
     # Reset per-run picked set once at the start of this entire run

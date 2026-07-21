@@ -9,6 +9,7 @@ import logging
 import json
 import math
 import random
+import argparse
 from datetime import datetime, date
 from collections import OrderedDict  # kept for potential future use
 
@@ -77,7 +78,12 @@ CATEGORY_MANDATORY_KEYWORDS = {
                  "in-hand manipulation", "robotic hand", "bimanual", "dual-arm",
                  "tactile", "haptic", "teleoperation", "teleoperated",
                  "egocentric", "human video", "human demonstration",
-                 "sim2real", "simulation benchmark manipulation"],
+                 "sim2real",
+                 # real2sim / real2sim2real / scene reconstruction / simulation eval / egocentric data
+                 "real2sim", "real2sim2real", "real-to-sim",
+                 "scene reconstruction", "3d reconstruction",
+                 "simulation benchmark", "simulation evaluation",
+                 "egocentric data"],
     },
     "tacvla": {
         # Must include core tactile terms (must be explicit tactile perception tech)
@@ -421,6 +427,28 @@ def process_category(category: str, category_config: dict, today_str: str, histo
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Paper Bot - automated paper crawler")
+    parser.add_argument(
+        "--category",
+        default=None,
+        help="Only crawl the given category (e.g. main/egobench/tacvla). "
+             "Omit to crawl all categories. "
+             "Comma-separated values are supported, e.g. --category egobench,tacvla",
+    )
+    args = parser.parse_args()
+
+    # Filter categories by the --category argument
+    if args.category:
+        requested = [c.strip() for c in args.category.split(",") if c.strip()]
+        unknown = [c for c in requested if c not in CATEGORIES]
+        if unknown:
+            logger.error(f"Unknown category: {unknown}. Available: {list(CATEGORIES.keys())}")
+            sys.exit(1)
+        categories = {c: CATEGORIES[c] for c in requested}
+        logger.info(f"Selected categories: {list(categories.keys())}")
+    else:
+        categories = CATEGORIES
+
     today_str = date.today().strftime("%Y-%m-%d")
     logger.info(f"=== Paper Bot started: {today_str} ===")
 
@@ -434,8 +462,8 @@ def main():
     # Reset per-run picked set once at the start of this entire run
     _picked_titles.clear()
 
-    # Process each category
-    for category, category_config in CATEGORIES.items():
+    # Process each (filtered) category
+    for category, category_config in categories.items():
         process_category(category, category_config, today_str, history, existing_folder_titles, paper_pool)
 
     # Save history

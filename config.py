@@ -66,6 +66,14 @@ CATEGORIES = {
             "tactile policy robot learning",
             "teleoperation robot manipulation",
             "multi-finger robotic grasping",
+            # real2sim / real2sim2real simulation training
+            '"real2sim2real" robot',
+            "real2sim robot manipulation",
+            "real-to-sim robot learning",
+            # scene reconstruction / simulation evaluation
+            "scene reconstruction robot manipulation",
+            "simulation benchmark manipulation",
+            "egocentric data robot",
         ],
         "required_keywords": [
             "dexterous", "dexterity", "multi-finger", "anthropomorphic hand",
@@ -73,8 +81,12 @@ CATEGORIES = {
             "bimanual", "two-arm", "dual-arm",
             "tactile", "touch", "haptic", "force sensing",
             "teleoperation", "teleoperated", "human demonstration",
-            "egocentric", "ego-centric", "human video",
+            "egocentric", "ego-centric", "human video", "egocentric data",
             "sim2real", "dexterous simulation",
+            # real2sim / scene reconstruction / simulation evaluation
+            "real2sim", "real2sim2real", "real-to-sim",
+            "scene reconstruction", "3d reconstruction",
+            "simulation benchmark", "simulation evaluation",
             "manipulation policy", "control policy",
         ],
         "deprioritize_keywords": [
